@@ -9,6 +9,8 @@ import re
 import time
 from concurrent.futures import ThreadPoolExecutor
 from random import randint
+
+from selenium.webdriver import Keys
 from selenium.webdriver.common.by import By
 
 
@@ -56,15 +58,22 @@ def seleniumLiteTrigger():
                 }
             }
 
-            driver = webdriver.Firefox(executable_path="driver/geckodriver", seleniumwire_options=options)
-            driver.get("https://ifconfig.me/")
-            time.sleep(randint(50,1500)/100)
-            driver.get(f"https://www.google.com/search?q=facebook")
-            time.sleep(randint(50,1500)/100)
-            if len(driver.find_elements(by=By.TAG_NAME, value="a")) < 5: raise Exception("Compromised IP, Rotating")
-            if '''<a href="http://ifconfig.me">What Is My IP Address? - ifconfig.me</a>''' in driver.page_source:
-                logger.debug(f"New Rotated IP: {driver.find_element(by=By.ID, value='ip_address').text}")
-                return driver
+            driver = webdriver.Firefox(executable_path="driver\\geckodriver.exe", seleniumwire_options=options)
+
+            # TODO remove
+            return driver
+
+            # driver.get("https://ifconfig.me/")
+            # time.sleep(randint(50,150)/100)
+            # driver.refresh()
+            # if '''<a href="http://ifconfig.me">What Is My IP Address? - ifconfig.me</a>''' in driver.page_source:
+            #     logger.debug(f"New Rotated IP: {driver.find_element(by=By.ID, value='ip_address').text}")
+            #     return driver
+
+            # driver.get(f"https://www.google.com")
+            # driver.get(f"https://www.google.com/search?q=facebook")
+            # if len(driver.find_elements(by=By.TAG_NAME, value="a")) < 5: raise Exception("Compromised IP, Rotating")
+            # time.sleep(randint(50,150)/100)
         except Exception as e:
             atmpt += 1
             driver.quit()
@@ -75,6 +84,7 @@ def seleniumLiteTrigger():
 
 def fetchMatchedEntries(driver, refWord, refDomain):
     entries = {a: x.get_attribute("href") for a, x in enumerate(driver.find_elements(by=By.TAG_NAME, value="a"))}
+
     matched = {}
     for x in entries:
         try:
@@ -83,12 +93,13 @@ def fetchMatchedEntries(driver, refWord, refDomain):
                 matched[x] = entries[x]
         except:
             continue
+    print(matched.keys())
     return matched
 
 
-def googleSearchModules(driver, searchKey, refWord, refDomain, pageMax=5):
+def googleSearchModules(driver, searchKey, refWord, refDomain, pageMax=10):
     driver.get(f"https://www.google.com/search?q={searchKey}")
-    time.sleep(randint(50,1500)/100)
+    # time.sleep(randint(50, 1500) / 100)
     matched = fetchMatchedEntries(driver, refWord, refDomain)
     pageNum = 0
     while len(matched) == 0:
@@ -104,8 +115,12 @@ def googleSearchModules(driver, searchKey, refWord, refDomain, pageMax=5):
 
 
 def secndryPageOps(driver, matched, secndaryAnchorText, refUrl):
-    driver.find_elements(by=By.TAG_NAME, value="a")[list(matched.keys())[0]].click()
+    # driver.find_elements(by=By.TAG_NAME, value="a")[list(matched.keys())[0]].click()
+    from selenium.webdriver import ActionChains
 
+    # driver.find_elements(by=By.TAG_NAME, value="a")[list(matched.keys())[0]].click()
+    [ActionChains(driver).send_keys(Keys.TAB).perform() for x in range([list(matched.keys())[0]])]
+    ActionChains(driver).send_keys(Keys.ENTER).perform()
     # Anchor Text to click: teen depression treatment
     try:
         [x for x in driver.find_elements(by=By.TAG_NAME, value="a") if secndaryAnchorText in x.text][0].click()
@@ -129,6 +144,7 @@ def tertryPageOps(driver, atmpt=0):
                 driver.quit()
             continue
 
+
 def singleThread(searchKey, refUrl, secndaryAnchorText):
     logger.debug("Starting new browser proxy")
     driver = seleniumLiteTrigger()
@@ -137,7 +153,7 @@ def singleThread(searchKey, refUrl, secndaryAnchorText):
         refWord = refUrl.strip("/").split("/")[-1]
         refDomain = re.findall(f'https?:\/\/([^\/]+)\/', refUrl)[0]
 
-        matched = googleSearchModules(driver, searchKey, refWord, refDomain, pageMax=5)
+        matched = googleSearchModules(driver, searchKey, refWord, refDomain, pageMax=10)
         if len(matched) > 0:
             secndryPageOps(driver, matched, secndaryAnchorText, refUrl)
             tertryPageOps(driver)
@@ -145,25 +161,27 @@ def singleThread(searchKey, refUrl, secndaryAnchorText):
         logger.debug(e)
     driver.quit()
 
+
 def core(searchKey, refUrl, secndaryAnchorText):
-    parallelWorkerCount = 20
+    parallelWorkerCount = 3
     confData = {
-        "searchKey":searchKey,
-        "refUrl":refUrl,
-        "secndaryAnchorText":secndaryAnchorText,
-        "parallelWorkerCount":parallelWorkerCount
+        "searchKey": searchKey,
+        "refUrl": refUrl,
+        "secndaryAnchorText": secndaryAnchorText,
+        "parallelWorkerCount": parallelWorkerCount
     }
-    logger.debug(f"Started run with configs: {json.dumps(confData,indent=3)}")
+    logger.debug(f"Started run with configs: {json.dumps(confData, indent=3)}")
+    singleThread(searchKey, refUrl, secndaryAnchorText)
 
-    with ThreadPoolExecutor(max_workers=parallelWorkerCount) as executor:
-        for x in range(parallelWorkerCount):
-            executor.submit(singleThread, searchKey, refUrl, secndaryAnchorText)
-        executor.shutdown(wait=True)
+    # with ThreadPoolExecutor(max_workers=parallelWorkerCount) as executor:
+    #     for x in range(parallelWorkerCount):
+    #         executor.submit(singleThread, searchKey, refUrl, secndaryAnchorText)
+    #     executor.shutdown(wait=True)
 
-    logger.debug(f"Completed run with configs: {json.dumps(confData, indent=3)}")
+    # logger.debug(f"Completed run with configs: {json.dumps(confData, indent=3)}")
 
 
 if __name__ == '__main__':
     '''
-    
+
     '''
