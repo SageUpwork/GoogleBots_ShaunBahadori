@@ -1,6 +1,6 @@
 async-generator==1.10
-attrs==21.4.0
-blinker==1.4
+attrs==22.1.0
+blinker==1.5
 Brotli==1.0.9
 certifi==2022.6.15
 cffi==1.15.1
@@ -23,6 +23,6 @@ sniffio==1.2.0
 sortedcontainers==2.4.0
 trio==0.21.0
 trio-websocket==0.9.2
-urllib3==1.26.10
+urllib3==1.26.11
 wsproto==1.1.0
 zstandard==0.18.0
