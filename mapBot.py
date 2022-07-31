@@ -51,12 +51,11 @@ def seleniumLiteTrigger():
             VPN_Pass = configs['VPN_Pass']
             VPN_IP_PORT = configs['VPN_IP_PORT'][randint(0, len(configs['VPN_IP_PORT']) - 1)]
             VPN_IP = VPN_IP_PORT.split(":")[0]
-            VPN_Port = VPN_IP_PORT.split(":")[1]
 
             options = {
                 'proxy': {
-                    "http": f"http://{VPN_User}:{VPN_Pass}@{VPN_IP}:{VPN_Port}",
-                    "https": f"https://{VPN_User}:{VPN_Pass}@{VPN_IP}:{VPN_Port}",
+                    "http": f"http://{VPN_User}:{VPN_Pass}@{VPN_IP_PORT}",
+                    "https": f"https://{VPN_User}:{VPN_Pass}@{VPN_IP_PORT}",
                     'no_proxy': 'localhost,127.0.0.1'
                 }
             }
@@ -102,32 +101,41 @@ def seleniumLiteTrigger():
                 raise e
 
 
-def fetchMatchedEntries(driver, refWord, refDomain):
-    entries = {a: {"href":x.get_attribute("href"),"unit":x} for a, x in enumerate(driver.find_elements(by=By.TAG_NAME, value="a"))}
+def fetchMatchedEntries(driver, mapTileIdentifierName):
+    driver.find_elements(by=By.TAG_NAME, value="a")
+    entries = {}
+    for a,x in enumerate(driver.find_elements(by=By.TAG_NAME, value="div")):
+        for b, y in enumerate(x.find_elements(by=By.TAG_NAME, value="a")):
+            try:
+                if "https://www.google.com/maps/place/" in y.get_attribute("href"):
+                    if x.get_attribute("role") == "article":
+                        entry = {}
+                        entry["href"] = y.get_attribute("href")
+                        entry["label"] = y.get_attribute("aria-label")
+                        entry["unit"] = y
+                        entry["parent"] = x
+                        entries[f"{a}_{b}"] = entry
+            except:
+                continue
 
     matched = {}
     for x in entries:
         try:
-            if (refWord in entries[x]['href']) & (refDomain in entries[x]['href']):
-                # print({x: entries[x]})
+            if mapTileIdentifierName.lower() in entries[x]['label'].lower():
                 matched[x] = entries[x]
         except:
             continue
-    print(matched.keys())
+    # print(matched.keys())
     return matched
 
 
 
-def googleSearchModules(driver, searchKey, refWord, refDomain, pageMax=10):
+def googleMapSearchModules(driver, searchKey, mapTileIdentifierName, pageMax=10):
     driver.maximize_window()
+    time.sleep(randint(100, 5000) / 1000)
+    driver.get(f"https://www.google.com/maps/search/{searchKey.replace(' ','+')}")
     time.sleep(randint(100, 5000) / 100)
-    driver.get(f"https://www.google.com/search?q={searchKey}")
-    time.sleep(randint(100, 5000) / 100)
-    # time.sleep(randint(50, 1500) / 100)
-    matched = fetchMatchedEntries(driver, refWord, refDomain)
-    #
-    # refWord, refDomain = ("psychcentral.com","teenage-depression-facts")
-    #
+    matched = fetchMatchedEntries(driver, mapTileIdentifierName)
 
     pageNum = 0
     while len(matched) == 0:
@@ -136,92 +144,76 @@ def googleSearchModules(driver, searchKey, refWord, refDomain, pageMax=10):
             # driver.quit()
             raise Exception("Keyword not found in Google Search data, increase pageMax or improve keyword precision")
         logger.debug(f"Starting search results page {pageNum}")
-        driver.find_element(by=By.ID, value="pnnext").click()
+
+        [ActionChains(driver).send_keys(Keys.TAB).perform() for x in range(9)]
+
+        ActionChains(driver).send_keys(Keys.PAGE_DOWN).perform()
+
         pageNum += 1
-        matched = {**matched, **fetchMatchedEntries(driver, refWord, refDomain)}
+        try: matched = {**matched, **fetchMatchedEntries(driver, mapTileIdentifierName)}
+        except:
+            time.sleep(5)
+            matched = {**matched, **fetchMatchedEntries(driver, mapTileIdentifierName)}
     return matched
 
 
-def secndryPageOps(driver, matched, secndaryAnchorText, refUrl):
+def secndryPageOps(driver, matched, mapTileIdentifierName, location="New York"):
+    time.sleep(5)
+    driver.execute_script("arguments[0].scrollIntoView();", matched[list(matched.keys())[0]]['parent'])
     matched[list(matched.keys())[0]]['unit'].click()
     time.sleep(randint(100, 5000) / 100)
-    time.sleep(5)
     try:
         try: WebDriverWait(driver, 30).until(EC.visibility_of_all_elements_located((By.TAG_NAME, "img")))
         except: pass
-        time.sleep(randint(100, 5000) / 1000)
-        # driver.execute_script("document.body.style.zoom='50 %'")
-        driver.execute_script("arguments[0].scrollIntoView();", [x for x in driver.find_elements(by=By.TAG_NAME, value="a") if secndaryAnchorText.lower() in x.text.lower()][0])
-        time.sleep(2)
-        ActionChains(driver).send_keys(Keys.PAGE_UP).perform()
-        time.sleep(randint(100, 5000) / 1000)
-        [x for x in driver.find_elements(by=By.TAG_NAME, value="a") if secndaryAnchorText in x.text][0].click()
+
+        try:
+            logger.debug("Attempting site loading")
+            # Website
+            [x for x in matched[list(matched.keys())[0]]['parent'].find_elements(by=By.TAG_NAME, value="a") if
+             x.get_attribute("data-value") == 'Website'][0].click()
+        except:
+            logger.debug(f"Attempting directions from {location}")
+            # Directions from "New York"
+            [x for x in matched[list(matched.keys())[0]]['parent'].find_elements(by=By.TAG_NAME, value="button") if x.get_attribute("data-value") == 'Directions'][0].click()
+            ActionChains(driver).send_keys("New York")
+
         time.sleep(2)
     except Exception as e:
-        logger.warning(f"Cant find 2nd anchor text {secndaryAnchorText} in {refUrl} : {e}")
+        logger.warning(f"Cant find Directions or Website entry {mapTileIdentifierName} : {e}")
 
 
-def tertryPageOps(driver, atmpt=0):
-    # Click on any random url after
-    tertryUrlList = driver.find_elements(by=By.TAG_NAME, value="a")
-    while atmpt < 5:
-        try:
-            try: WebDriverWait(driver, 30).until(EC.visibility_of_all_elements_located((By.TAG_NAME, "img")))
-            except: pass
-            # driver.execute_script("document.body.style.zoom='50 %'")
-            time.sleep(randint(100, 5000) / 1000)
-            driver.execute_script("arguments[0].scrollIntoView();", tertryUrlList[randint(0, len(tertryUrlList))])
-            time.sleep(2)
-            tertryUrlList[randint(0, len(tertryUrlList))].click()
-            time.sleep(2)
-            return True
-            # driver.quit()
-        except:
-            atmpt += 1
-            time.sleep(2)
-            if atmpt == 4:
-                logger.debug("Cant find clickable tertiary urls")
-                return False
-                # driver.quit()
-            continue
 
-
-def singleThread(searchKey, refUrl, secndaryAnchorText):
+def singleThread(searchKey, mapTileIdentifierName):
     logger.debug("Starting new browser proxy")
     driver = seleniumLiteTrigger()
     try:
-        refWord = refUrl.strip("/").split("/")[-1]
-        refDomain = re.findall(f'https?:\/\/([^\/]+)\/', refUrl)[0]
-
-        matched = googleSearchModules(driver, searchKey, refWord, refDomain, pageMax=10)
+        matched = googleMapSearchModules(driver, searchKey, mapTileIdentifierName, pageMax=10)
         if len(matched) > 0:
-            secndryPageOps(driver, matched, secndaryAnchorText, refUrl)
-            time.sleep(3)
-            tertryPageOps(driver)
+            time.sleep(randint(100, 5000) / 1000)
+            secndryPageOps(driver, matched, mapTileIdentifierName)
             time.sleep(randint(100, 5000) / 1000)
     except Exception as e:
         logger.debug(e)
     driver.quit()
 
 
-def core(searchKey, refUrl, secndaryAnchorText):
+def core(searchKey, mapTileIdentifierName):
     parallelWorkerCount = 5
     confData = {
         "searchKey": searchKey,
-        "refUrl": refUrl,
-        "secndaryAnchorText": secndaryAnchorText,
+        "mapTileIdentifierName": mapTileIdentifierName,
         "parallelWorkerCount": parallelWorkerCount
     }
     logger.debug(f"Started run with configs: {json.dumps(confData, indent=3)}")
-    # singleThread(searchKey, refUrl, secndaryAnchorText)
-
-    with ThreadPoolExecutor(max_workers=parallelWorkerCount) as executor:
-        for x in range(parallelWorkerCount):
-            executor.submit(singleThread, searchKey, refUrl, secndaryAnchorText)
-        executor.shutdown(wait=True)
-
-    logger.debug(f"Completed run with configs: {json.dumps(confData, indent=3)}")
-
+    singleThread(searchKey, mapTileIdentifierName)
+    #
+    # with ThreadPoolExecutor(max_workers=parallelWorkerCount) as executor:
+    #     for x in range(parallelWorkerCount):
+    #         executor.submit(singleThread, searchKey, refUrl, secndaryAnchorText)
+    #     executor.shutdown(wait=True)
+    #
+    # logger.debug(f"Completed run with configs: {json.dumps(confData, indent=3)}")
+    #
 
 if __name__ == '__main__':
     '''
