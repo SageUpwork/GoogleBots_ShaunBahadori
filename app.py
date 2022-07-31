@@ -5,6 +5,7 @@
 import json
 import os
 import logging
+import platform
 import re
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -12,8 +13,9 @@ from random import randint
 
 from selenium.webdriver import Keys
 from selenium.webdriver.common.by import By
-
-
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver import ActionChains
+from selenium.webdriver.support import expected_conditions as EC
 def loggerInit(logFileName):
     try:
         os.makedirs("logs")
@@ -47,139 +49,171 @@ def seleniumLiteTrigger():
         try:
             VPN_User = configs['VPN_User']
             VPN_Pass = configs['VPN_Pass']
-            VPN_IP = configs['VPN_IP'][randint(0, len(configs['VPN_IP']) - 1)]
-            VPN_Port = configs['VPN_Port']
+            VPN_IP_PORT = configs['VPN_IP_PORT'][randint(0, len(configs['VPN_IP_PORT']) - 1)]
+            VPN_IP = VPN_IP_PORT.split(":")[0]
 
             options = {
                 'proxy': {
-                    "http": f"http://{VPN_User}:{VPN_Pass}@{VPN_IP}:{VPN_Port}",
-                    "https": f"https://{VPN_User}:{VPN_Pass}@{VPN_IP}:{VPN_Port}",
+                    "http": f"http://{VPN_User}:{VPN_Pass}@{VPN_IP_PORT}",
+                    "https": f"https://{VPN_User}:{VPN_Pass}@{VPN_IP_PORT}",
                     'no_proxy': 'localhost,127.0.0.1'
                 }
             }
+            if "Windows" in str(platform.system()):
+                # WINDOWS
+                geckoPath = r"driver\\geckodriver.exe"
+                moz_profPath = r"C:\Users\SaGe\AppData\Roaming\Mozilla\Firefox\Profiles\jbz9m3sj.default"
+                # driver = webdriver.Firefox(options=options, executable_path=geckoPath)
+            elif "Linux" in str(platform.system()):
+                # Linux
+                geckoPath = r"driver/geckodriver"
+                moz_profPath = r"/home/sage/.mozilla/firefox/249x8q9b.default-release"
+            else:
+                # Mac
+                geckoPath = r"driver/geckodriver"
+                moz_profPath = r"/Users/SaGe/Library/Application Support/Firefox/Profiles/24po1ob3.default-release"
 
-            driver = webdriver.Firefox(executable_path="driver\\geckodriver.exe", seleniumwire_options=options)
+            driver = webdriver.Firefox(executable_path=geckoPath, seleniumwire_options=options)
+            time.sleep(randint(100, 5000) / 1000)
+            try:
+                driver.get("https://ifconfig.me/")
+                time.sleep(randint(50,150)/100)
+                driver.refresh()
+                if '''<a href="http://ifconfig.me">What Is My IP Address? - ifconfig.me</a>''' in driver.page_source:
+                    logger.debug(f"New Rotated IP: {driver.find_element(by=By.ID, value='ip_address').text}")
+                    return driver
 
-            # TODO remove
-            return driver
+                # driver.get(f"https://www.google.com")
+                # driver.get(f"https://www.google.com/search?q=facebook")
+                # if len(driver.find_elements(by=By.TAG_NAME, value="a")) < 5: raise Exception("Compromised IP, Rotating")
+                time.sleep(randint(50,150)/100)
+                # TODO remove
+                return driver
+            except:
+                driver.quit()
+                raise Exception("BadSession")
 
-            # driver.get("https://ifconfig.me/")
-            # time.sleep(randint(50,150)/100)
-            # driver.refresh()
-            # if '''<a href="http://ifconfig.me">What Is My IP Address? - ifconfig.me</a>''' in driver.page_source:
-            #     logger.debug(f"New Rotated IP: {driver.find_element(by=By.ID, value='ip_address').text}")
-            #     return driver
-
-            # driver.get(f"https://www.google.com")
-            # driver.get(f"https://www.google.com/search?q=facebook")
-            # if len(driver.find_elements(by=By.TAG_NAME, value="a")) < 5: raise Exception("Compromised IP, Rotating")
-            # time.sleep(randint(50,150)/100)
         except Exception as e:
             atmpt += 1
-            driver.quit()
+
             logger.debug("IP unavailable, rotating.")
             if atmpt == 10:
                 raise e
 
 
-def fetchMatchedEntries(driver, refWord, refDomain):
-    entries = {a: x.get_attribute("href") for a, x in enumerate(driver.find_elements(by=By.TAG_NAME, value="a"))}
+def fetchMatchedEntries(driver, mapTileIdentifierName):
+    driver.find_elements(by=By.TAG_NAME, value="a")
+    entries = {}
+    for a,x in enumerate(driver.find_elements(by=By.TAG_NAME, value="div")):
+        for b, y in enumerate(x.find_elements(by=By.TAG_NAME, value="a")):
+            try:
+                if "https://www.google.com/maps/place/" in y.get_attribute("href"):
+                    if x.get_attribute("role") == "article":
+                        entry = {}
+                        entry["href"] = y.get_attribute("href")
+                        entry["label"] = y.get_attribute("aria-label")
+                        entry["unit"] = y
+                        entry["parent"] = x
+                        entries[f"{a}_{b}"] = entry
+            except:
+                continue
 
     matched = {}
     for x in entries:
         try:
-            if (refWord in entries[x]) & (refDomain in entries[x]):
-                # print({x: entries[x]})
+            if mapTileIdentifierName.lower() in entries[x]['label'].lower():
                 matched[x] = entries[x]
         except:
             continue
-    print(matched.keys())
+    # print(matched.keys())
     return matched
 
 
-def googleSearchModules(driver, searchKey, refWord, refDomain, pageMax=10):
-    driver.get(f"https://www.google.com/search?q={searchKey}")
-    # time.sleep(randint(50, 1500) / 100)
-    matched = fetchMatchedEntries(driver, refWord, refDomain)
+
+def googleMapSearchModules(driver, searchKey, mapTileIdentifierName, pageMax=10):
+    driver.maximize_window()
+    time.sleep(randint(100, 5000) / 1000)
+    driver.get(f"https://www.google.com/maps/search/{searchKey.replace(' ','+')}")
+    time.sleep(randint(100, 5000) / 100)
+    matched = fetchMatchedEntries(driver, mapTileIdentifierName)
+
     pageNum = 0
     while len(matched) == 0:
         if pageNum == pageMax:
             logger.debug(f"Result page {pageMax} reached. Halting run")
-            driver.quit()
+            # driver.quit()
             raise Exception("Keyword not found in Google Search data, increase pageMax or improve keyword precision")
         logger.debug(f"Starting search results page {pageNum}")
-        driver.find_element(by=By.ID, value="pnnext").click()
+
+        [ActionChains(driver).send_keys(Keys.TAB).perform() for x in range(9)]
+
+        ActionChains(driver).send_keys(Keys.PAGE_DOWN).perform()
+
         pageNum += 1
-        matched = {**matched, **fetchMatchedEntries(driver, refWord, refDomain)}
+        try: matched = {**matched, **fetchMatchedEntries(driver, mapTileIdentifierName)}
+        except:
+            time.sleep(5)
+            matched = {**matched, **fetchMatchedEntries(driver, mapTileIdentifierName)}
     return matched
 
 
-def secndryPageOps(driver, matched, secndaryAnchorText, refUrl):
-    # driver.find_elements(by=By.TAG_NAME, value="a")[list(matched.keys())[0]].click()
-    from selenium.webdriver import ActionChains
-
-    # driver.find_elements(by=By.TAG_NAME, value="a")[list(matched.keys())[0]].click()
-    [ActionChains(driver).send_keys(Keys.TAB).perform() for x in range([list(matched.keys())[0]])]
-    ActionChains(driver).send_keys(Keys.ENTER).perform()
-    # Anchor Text to click: teen depression treatment
+def secndryPageOps(driver, matched, mapTileIdentifierName, location="New York"):
+    time.sleep(5)
+    driver.execute_script("arguments[0].scrollIntoView();", matched[list(matched.keys())[0]]['parent'])
+    matched[list(matched.keys())[0]]['unit'].click()
+    time.sleep(randint(100, 5000) / 100)
     try:
-        [x for x in driver.find_elements(by=By.TAG_NAME, value="a") if secndaryAnchorText in x.text][0].click()
-    except:
-        logger.warning(f"Cant find 2nd anchor text {secndaryAnchorText} in {refUrl}")
+        try: WebDriverWait(driver, 30).until(EC.visibility_of_all_elements_located((By.TAG_NAME, "img")))
+        except: pass
 
-
-def tertryPageOps(driver, atmpt=0):
-    # Click on any random url after
-    tertryUrlList = driver.find_elements(by=By.TAG_NAME, value="a")
-    while atmpt < 5:
         try:
-            tertryUrlList[randint(0, len(tertryUrlList))].click()
-            time.sleep(10)
-            driver.quit()
+            logger.debug("Attempting site loading")
+            # Website
+            [x for x in matched[list(matched.keys())[0]]['parent'].find_elements(by=By.TAG_NAME, value="a") if
+             x.get_attribute("data-value") == 'Website'][0].click()
         except:
-            atmpt += 1
-            time.sleep(2)
-            if atmpt == 4:
-                logger.debug("Cant find clickable tertiary urls")
-                driver.quit()
-            continue
+            logger.debug(f"Attempting directions from {location}")
+            # Directions from "New York"
+            [x for x in matched[list(matched.keys())[0]]['parent'].find_elements(by=By.TAG_NAME, value="button") if x.get_attribute("data-value") == 'Directions'][0].click()
+            ActionChains(driver).send_keys("New York")
+
+        time.sleep(2)
+    except Exception as e:
+        logger.warning(f"Cant find Directions or Website entry {mapTileIdentifierName} : {e}")
 
 
-def singleThread(searchKey, refUrl, secndaryAnchorText):
+
+def singleThread(searchKey, mapTileIdentifierName):
     logger.debug("Starting new browser proxy")
     driver = seleniumLiteTrigger()
     try:
-        # Click on this URL: https://urbanmatter.com/why-is-the-rate-of-teenage-depression-increasing-after-the-pandemic/
-        refWord = refUrl.strip("/").split("/")[-1]
-        refDomain = re.findall(f'https?:\/\/([^\/]+)\/', refUrl)[0]
-
-        matched = googleSearchModules(driver, searchKey, refWord, refDomain, pageMax=10)
+        matched = googleMapSearchModules(driver, searchKey, mapTileIdentifierName, pageMax=10)
         if len(matched) > 0:
-            secndryPageOps(driver, matched, secndaryAnchorText, refUrl)
-            tertryPageOps(driver)
+            time.sleep(randint(100, 5000) / 1000)
+            secndryPageOps(driver, matched, mapTileIdentifierName)
+            time.sleep(randint(100, 5000) / 1000)
     except Exception as e:
         logger.debug(e)
     driver.quit()
 
 
-def core(searchKey, refUrl, secndaryAnchorText):
-    parallelWorkerCount = 3
+def core(searchKey, mapTileIdentifierName):
+    parallelWorkerCount = 5
     confData = {
         "searchKey": searchKey,
-        "refUrl": refUrl,
-        "secndaryAnchorText": secndaryAnchorText,
+        "mapTileIdentifierName": mapTileIdentifierName,
         "parallelWorkerCount": parallelWorkerCount
     }
     logger.debug(f"Started run with configs: {json.dumps(confData, indent=3)}")
-    singleThread(searchKey, refUrl, secndaryAnchorText)
-
+    singleThread(searchKey, mapTileIdentifierName)
+    #
     # with ThreadPoolExecutor(max_workers=parallelWorkerCount) as executor:
     #     for x in range(parallelWorkerCount):
     #         executor.submit(singleThread, searchKey, refUrl, secndaryAnchorText)
     #     executor.shutdown(wait=True)
-
+    #
     # logger.debug(f"Completed run with configs: {json.dumps(confData, indent=3)}")
-
+    #
 
 if __name__ == '__main__':
     '''

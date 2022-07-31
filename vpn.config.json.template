@@ -1,7 +1,8 @@
+
 {
- "VPN_User": "",
- "VPN_Pass": "",
- "VPN_IP_US": ["us-atl.pvdata.host", "us-buf.pvdata.host", "us-chi.pvdata.host", "us-chi2.pvdata.host", "us-dal.pvdata.host", "us-las.pvdata.host", "us-los.pvdata.host", "us-mia.pvdata.host", "us-jer.pvdata.host", "us-nyc.pvdata.host", "us-nyc2.pvdata.host", "us-nyc4.pvdata.host", "us-pho.pvdata.host"],
- "VPN_Port": "8080"
+ "VPN_Pass": "g1VLX4QH",
+ "VPN_User": "shaunb",
+ "VPN_IP": ["208.100.6.142"],
+ "VPN_Port": "45623"
 }
 

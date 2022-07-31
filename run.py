@@ -4,12 +4,10 @@
 # ------------------------------------------------------------
 from app import core
 
-searchKey = 'teen depression rates'
-refUrl = "https://atriskyouthprograms.com/why-is-the-rate-of-teenage-depression-increasing-after-the-pandemic/"
-secndaryAnchorText = 'teen depression treatment'
+searchKey = 'teen iop los angeles'
+mapTileIdentifierName = 'Key Transitions Teen Treatment Program'
 
 
-
-core(searchKey, refUrl, secndaryAnchorText)
+core(searchKey, mapTileIdentifierName)
 
 
