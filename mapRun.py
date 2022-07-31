@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 # ------------------------------------------------------------
-from app import core
+from mapBot import core
 
 searchKey = 'teen iop los angeles'
 mapTileIdentifierName = 'Key Transitions Teen Treatment Program'
