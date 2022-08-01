@@ -132,9 +132,8 @@ def fetchMatchedEntries(driver, mapTileIdentifierName):
 
 def googleMapSearchModules(driver, searchKey, mapTileIdentifierName, pageMax=10):
     driver.maximize_window()
-    time.sleep(randint(100, 5000) / 1000)
     driver.get(f"https://www.google.com/maps/search/{searchKey.replace(' ','+')}")
-    time.sleep(randint(100, 5000) / 100)
+    time.sleep(randint(2000, 10000) / 1000)
     matched = fetchMatchedEntries(driver, mapTileIdentifierName)
 
     pageNum = 0
@@ -161,7 +160,7 @@ def secndryPageOps(driver, matched, mapTileIdentifierName, location="New York"):
     time.sleep(5)
     driver.execute_script("arguments[0].scrollIntoView();", matched[list(matched.keys())[0]]['parent'])
     matched[list(matched.keys())[0]]['unit'].click()
-    time.sleep(randint(100, 5000) / 100)
+    time.sleep(randint(100, 5000) / 1000)
     try:
         try: WebDriverWait(driver, 30).until(EC.visibility_of_all_elements_located((By.TAG_NAME, "img")))
         except: pass
@@ -217,5 +216,5 @@ def core(searchKey, mapTileIdentifierName):
 
 if __name__ == '__main__':
     '''
-
+    
     '''

@@ -5,3 +5,14 @@ Please download and install the listed dependencies on machine:
 
 To prep script for runtime, please run:
 pip install -r requirements.txt
+
+To run:
+>    cd .\Desktop\GoogleBots_ShaunBahadori\
+
+
+>	python.exe mapRun.py
+
+	or
+
+	python.exe SEOBacklinkRun.py
+
