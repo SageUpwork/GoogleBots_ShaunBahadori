@@ -176,7 +176,7 @@ def secndryPageOps(driver, matched, mapTileIdentifierName, location="New York"):
             [x for x in matched[list(matched.keys())[0]]['parent'].find_elements(by=By.TAG_NAME, value="button") if x.get_attribute("data-value") == 'Directions'][0].click()
             ActionChains(driver).send_keys("New York")
 
-        time.sleep(2)
+        time.sleep(20)
     except Exception as e:
         logger.warning(f"Cant find Directions or Website entry {mapTileIdentifierName} : {e}")
 
