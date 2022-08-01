@@ -6,8 +6,9 @@ from mapBot import core
 
 searchKey = 'teen iop los angeles'
 mapTileIdentifierName = 'Key Transitions Teen Treatment Program'
+trafficCount = 500
+parallelWorkerCount = 5
 
-
-core(searchKey, mapTileIdentifierName)
+core(searchKey, mapTileIdentifierName, trafficCount, parallelWorkerCount)
 
 

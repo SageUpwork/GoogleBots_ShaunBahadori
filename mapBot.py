@@ -3,6 +3,7 @@
 
 # ------------------------------------------------------------
 import json
+import math
 import os
 import logging
 import platform
@@ -196,22 +197,25 @@ def singleThread(searchKey, mapTileIdentifierName):
     driver.quit()
 
 
-def core(searchKey, mapTileIdentifierName):
-    parallelWorkerCount = 5
+def core(searchKey, mapTileIdentifierName, trafficCount, parallelWorkerCount):
+
     confData = {
         "searchKey": searchKey,
         "mapTileIdentifierName": mapTileIdentifierName,
         "parallelWorkerCount": parallelWorkerCount
     }
     logger.debug(f"Started run with configs: {json.dumps(confData, indent=3)}")
-    singleThread(searchKey, mapTileIdentifierName)
+    # singleThread(searchKey, mapTileIdentifierName)
     #
-    # with ThreadPoolExecutor(max_workers=parallelWorkerCount) as executor:
-    #     for x in range(parallelWorkerCount):
-    #         executor.submit(singleThread, searchKey, refUrl, secndaryAnchorText)
-    #     executor.shutdown(wait=True)
-    #
-    # logger.debug(f"Completed run with configs: {json.dumps(confData, indent=3)}")
+
+    for a in range(math.ceil(trafficCount/parallelWorkerCount)):
+        logger.debug(f"Completed {a*parallelWorkerCount} traffic generation")
+        with ThreadPoolExecutor(max_workers=parallelWorkerCount) as executor:
+            for x in range(parallelWorkerCount):
+                executor.submit(singleThread, searchKey, mapTileIdentifierName)
+            executor.shutdown(wait=True)
+
+    logger.debug(f"Completed run with configs: {json.dumps(confData, indent=3)}")
     #
 
 if __name__ == '__main__':

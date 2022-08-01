@@ -3,6 +3,7 @@
 
 # ------------------------------------------------------------
 import json
+import math
 import os
 import logging
 import platform
@@ -204,8 +205,7 @@ def singleThread(searchKey, refUrl, secndaryAnchorText):
     driver.quit()
 
 
-def core(searchKey, refUrl, secndaryAnchorText):
-    parallelWorkerCount = 5
+def core(searchKey, refUrl, secndaryAnchorText, trafficCount, parallelWorkerCount):
     confData = {
         "searchKey": searchKey,
         "refUrl": refUrl,
@@ -215,10 +215,12 @@ def core(searchKey, refUrl, secndaryAnchorText):
     logger.debug(f"Started run with configs: {json.dumps(confData, indent=3)}")
     # singleThread(searchKey, refUrl, secndaryAnchorText)
 
-    with ThreadPoolExecutor(max_workers=parallelWorkerCount) as executor:
-        for x in range(parallelWorkerCount):
-            executor.submit(singleThread, searchKey, refUrl, secndaryAnchorText)
-        executor.shutdown(wait=True)
+    for a in range(math.ceil(trafficCount/parallelWorkerCount)):
+        logger.debug(f"Completed {a*parallelWorkerCount} traffic generation")
+        with ThreadPoolExecutor(max_workers=parallelWorkerCount) as executor:
+            for x in range(parallelWorkerCount):
+                executor.submit(singleThread, searchKey, refUrl, secndaryAnchorText)
+            executor.shutdown(wait=True)
 
     logger.debug(f"Completed run with configs: {json.dumps(confData, indent=3)}")
 
