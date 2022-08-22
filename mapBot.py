@@ -7,6 +7,7 @@ import math
 import os
 import logging
 import platform
+import random
 import re
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -183,8 +184,10 @@ def secndryPageOps(driver, matched, mapTileIdentifierName, location="New York"):
 
 
 
-def singleThread(searchKey, mapTileIdentifierName):
+def queueWorker(x):
     logger.debug("Starting new browser proxy")
+    logger.debug(f"Starting {x}")
+    searchKey, mapTileIdentifierName = x
     driver = seleniumLiteTrigger()
     try:
         matched = googleMapSearchModules(driver, searchKey, mapTileIdentifierName, pageMax=10)
@@ -197,28 +200,39 @@ def singleThread(searchKey, mapTileIdentifierName):
     driver.quit()
 
 
-def core(searchKey, mapTileIdentifierName, trafficCount, parallelWorkerCount):
+def core(queueData, parallelWorkerCount, df):
+    queueOfTasks = []
+    for x in queueData:
+        searchKey, mapTileIdentifierName, trafficCount, dailyCount, completedCount = queueData[x]['searchKey'], \
+                                                                                     queueData[x]['mapTileIdentifierName'], \
+                                                                                     queueData[x]['trafficCount'], \
+                                                                                     queueData[x]['dailyCount'], \
+                                                                                     queueData[x]['completedCount']
+        pendingCount = int(dailyCount) - int(completedCount)
+        queueOfTasks += [(searchKey, mapTileIdentifierName)] * pendingCount
+    df["completedCount"] = df["dailyCount"]
+    cacheableCopy = queueOfTasks.copy()
+    cacheableCopy += json.loads(open("mapRun_Queue.cache", "r").read())
+    open("mapRun_Queue.cache", "w").write(json.dumps(cacheableCopy, indent=3))
+    random.shuffle(queueOfTasks)
+    df.to_csv('mapRun_Queue.csv', index=False)
+    queueOfTasks_Set = [queueOfTasks[i:i + parallelWorkerCount] for i in
+                        range(0, len(queueOfTasks), parallelWorkerCount)]
+    for a,queueOfTasks in enumerate(queueOfTasks_Set[::-1]):
+        logger.debug(f"Processing {(a*100)//len(queueOfTasks_Set)}% of daily traffic")
+        try:
+            with ThreadPoolExecutor(max_workers=parallelWorkerCount) as executor:
+                for x in queueOfTasks:
+                    executor.submit(queueWorker, x)
+                executor.shutdown(wait=True)
+        except Exception as e:
+            logger.debug(e)
 
-    confData = {
-        "searchKey": searchKey,
-        "mapTileIdentifierName": mapTileIdentifierName,
-        "parallelWorkerCount": parallelWorkerCount
-    }
-    logger.debug(f"Started run with configs: {json.dumps(confData, indent=3)}")
-    # singleThread(searchKey, mapTileIdentifierName)
-    #
-
-    for a in range(math.ceil(trafficCount/parallelWorkerCount)):
-        logger.debug(f"Completed {a*parallelWorkerCount} traffic generation")
-        with ThreadPoolExecutor(max_workers=parallelWorkerCount) as executor:
-            for x in range(parallelWorkerCount):
-                executor.submit(singleThread, searchKey, mapTileIdentifierName)
-            executor.shutdown(wait=True)
-
-    logger.debug(f"Completed run with configs: {json.dumps(confData, indent=3)}")
-    #
+        [cacheableCopy.pop() for _ in range(len(queueOfTasks))]
+        open("mapRun_Queue.cache", "w").write(json.dumps(cacheableCopy, indent=3))
 
 if __name__ == '__main__':
     '''
-    
+    searchKey = 'brooklyn steakhouse times square'
+    mapTileIdentifierName = 'Brooklyn Chop House Steakhouse Times Square'
     '''
