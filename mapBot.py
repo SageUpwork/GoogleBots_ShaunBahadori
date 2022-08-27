@@ -202,6 +202,7 @@ def queueWorker(x):
 
 def core(queueData, parallelWorkerCount, df):
     queueOfTasks = []
+    df.fillna(0)
     for x in queueData:
         searchKey, mapTileIdentifierName, trafficCount, dailyCount, completedCount = queueData[x]['searchKey'], \
                                                                                      queueData[x]['mapTileIdentifierName'], \
@@ -211,10 +212,11 @@ def core(queueData, parallelWorkerCount, df):
         pendingCount = int(dailyCount) - int(completedCount)
         queueOfTasks += [(searchKey, mapTileIdentifierName)] * pendingCount
     df["completedCount"] = df["dailyCount"]
+    df["trafficCount"] = df["trafficCount"] - df["dailyCount"]
+    queueOfTasks += json.loads(open("mapRun_Queue.cache", "r").read())
     cacheableCopy = queueOfTasks.copy()
-    cacheableCopy += json.loads(open("mapRun_Queue.cache", "r").read())
-    open("mapRun_Queue.cache", "w").write(json.dumps(cacheableCopy, indent=3))
     random.shuffle(queueOfTasks)
+    open("mapRun_Queue.cache", "w").write(json.dumps(queueOfTasks, indent=3))
     df.to_csv('mapRun_Queue.csv', index=False)
     queueOfTasks_Set = [queueOfTasks[i:i + parallelWorkerCount] for i in
                         range(0, len(queueOfTasks), parallelWorkerCount)]

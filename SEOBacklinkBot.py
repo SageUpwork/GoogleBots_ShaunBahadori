@@ -7,6 +7,7 @@ import math
 import os
 import logging
 import platform
+import random
 import re
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -187,7 +188,8 @@ def tertryPageOps(driver, atmpt=0):
             continue
 
 
-def singleThread(searchKey, refUrl, secndaryAnchorText):
+def singleThread(queueEntry):
+    searchKey, refUrl, secndaryAnchorText = queueEntry
     logger.debug("Starting new browser proxy")
     driver = seleniumLiteTrigger()
     try:
@@ -205,24 +207,58 @@ def singleThread(searchKey, refUrl, secndaryAnchorText):
     driver.quit()
 
 
-def core(searchKey, refUrl, secndaryAnchorText, trafficCount, parallelWorkerCount):
-    confData = {
-        "searchKey": searchKey,
-        "refUrl": refUrl,
-        "secndaryAnchorText": secndaryAnchorText,
-        "parallelWorkerCount": parallelWorkerCount
-    }
-    logger.debug(f"Started run with configs: {json.dumps(confData, indent=3)}")
-    # singleThread(searchKey, refUrl, secndaryAnchorText)
+def core(queueData, parallelWorkerCount, df):
+    queueOfTasks = []
+    df.fillna(0)
+    for x in queueData:
+        searchKey, refUrl, secndaryAnchorText, trafficCount, dailyCount, completedCount = queueData[x]['searchKey'], \
+                                                                                          queueData[x]['refUrl'], \
+                                                                                          queueData[x]['secndaryAnchorText'], \
+                                                                                          queueData[x]['trafficCount'], \
+                                                                                          queueData[x]['dailyCount'], \
+                                                                                          queueData[x]['completedCount']
+        pendingCount = int(dailyCount) - int(completedCount)
+        queueOfTasks += [(searchKey, refUrl, secndaryAnchorText)] * pendingCount
+    df["completedCount"] = df["dailyCount"]
+    df["trafficCount"] = df["trafficCount"] - df["dailyCount"]
+    queueOfTasks += json.loads(open("backLinkRun_Queue.cache", "r").read())
+    cacheableCopy = queueOfTasks.copy()
+    random.shuffle(queueOfTasks)
+    open("backLinkRun_Queue.cache", "w").write(json.dumps(queueOfTasks, indent=3))
+    df.to_csv('backLinkRun_Queue.csv', index=False)
+    queueOfTasks_Set = [queueOfTasks[i:i + parallelWorkerCount] for i in
+                        range(0, len(queueOfTasks), parallelWorkerCount)]
+    for a, queueOfTasks in enumerate(queueOfTasks_Set[::-1]):
+        logger.debug(f"Processing {(a * 100) // len(queueOfTasks_Set)}% of daily traffic")
+        try:
+            with ThreadPoolExecutor(max_workers=parallelWorkerCount) as executor:
+                for queueEntry in queueOfTasks:
+                    executor.submit(singleThread, queueEntry)
+                executor.shutdown(wait=True)
+        except Exception as e:
+            logger.debug(e)
 
-    for a in range(math.ceil(trafficCount/parallelWorkerCount)):
-        logger.debug(f"Completed {a*parallelWorkerCount} traffic generation")
-        with ThreadPoolExecutor(max_workers=parallelWorkerCount) as executor:
-            for x in range(parallelWorkerCount):
-                executor.submit(singleThread, searchKey, refUrl, secndaryAnchorText)
-            executor.shutdown(wait=True)
+        [cacheableCopy.pop() for _ in range(len(queueOfTasks))]
+        open("backLinkRun_Queue.cache", "w").write(json.dumps(cacheableCopy, indent=3))
 
-    logger.debug(f"Completed run with configs: {json.dumps(confData, indent=3)}")
+    #
+    # confData = {
+    #     "searchKey": searchKey,
+    #     "refUrl": refUrl,
+    #     "secndaryAnchorText": secndaryAnchorText,
+    #     "parallelWorkerCount": parallelWorkerCount
+    # }
+    # logger.debug(f"Started run with configs: {json.dumps(confData, indent=3)}")
+    # # singleThread(searchKey, refUrl, secndaryAnchorText)
+    #
+    # for a in range(math.ceil(trafficCount/parallelWorkerCount)):
+    #     logger.debug(f"Completed {a*parallelWorkerCount} traffic generation")
+    #     with ThreadPoolExecutor(max_workers=parallelWorkerCount) as executor:
+    #         for x in range(parallelWorkerCount):
+    #             executor.submit(singleThread, searchKey, refUrl, secndaryAnchorText)
+    #         executor.shutdown(wait=True)
+    #
+    # logger.debug(f"Completed run with configs: {json.dumps(confData, indent=3)}")
 
 
 if __name__ == '__main__':

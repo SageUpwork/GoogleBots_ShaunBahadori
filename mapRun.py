@@ -40,12 +40,14 @@ if __name__ == '__main__':
     print("Is this first run today? [Y/N]")
     freshCheck = input()
     df= pd.read_csv('mapRun_Queue.csv')
+    df.fillna(0)
     queueData = df.transpose().to_dict()
     if freshCheck == "Y":
         df["completedCount"] = 0
         df.to_csv('mapRun_Queue.csv', index=False)
         core(queueData, parallelWorkerCount, df)
     elif freshCheck == "N":
+        pass
         core(queueData, parallelWorkerCount, df)
     else:
         logger.debug("Invalid reply. Please restart app")
