@@ -10,9 +10,23 @@ To run:
 >    cd .\Desktop\GoogleBots_ShaunBahadori\
 
 
->	python.exe mapRun.py
+>	python.exe mapRun.py [instant]
+	python.exe .\mapBot_Scheduler.py [scheduled run]
 
 	or
 
-	python.exe SEOBacklinkRun.py
+	python.exe SEOBacklinkRun.py [instant]
+	python.exe .\SEOBacklinkBot_Scheduler.py [scheduled run]
 
+
+
+> For modifying scheduled run time/trigger
+
+>mapBot_Scheduler.py
+modify line 21
+
+>SEOBacklinkBot_Scheduler.py
+modify line 22
+
+> with this template
+scheduler.add_job(mainRun, 'cron', hour= <HOUR OF DAY TO START>, minute= <MINUTE OF DAY TO START>, max_instances=1)
