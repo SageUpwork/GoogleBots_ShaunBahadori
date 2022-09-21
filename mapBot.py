@@ -76,10 +76,10 @@ def seleniumLiteTrigger():
                 moz_profPath = r"/Users/SaGe/Library/Application Support/Firefox/Profiles/24po1ob3.default-release"
 
             driver = webdriver.Firefox(executable_path=geckoPath, seleniumwire_options=options)
-            time.sleep(randint(100, 5000) / 1000)
+            time.sleep(randint(10000, 100000) / 10000)
             try:
                 driver.get("https://ifconfig.me/")
-                time.sleep(randint(50,150)/100)
+                time.sleep(randint(50,150)/1000)
                 driver.refresh()
                 if '''<a href="http://ifconfig.me">What Is My IP Address? - ifconfig.me</a>''' in driver.page_source:
                     logger.debug(f"New Rotated IP: {driver.find_element(by=By.ID, value='ip_address').text}")
@@ -88,7 +88,7 @@ def seleniumLiteTrigger():
                 # driver.get(f"https://www.google.com")
                 # driver.get(f"https://www.google.com/search?q=facebook")
                 # if len(driver.find_elements(by=By.TAG_NAME, value="a")) < 5: raise Exception("Compromised IP, Rotating")
-                time.sleep(randint(50,150)/100)
+                time.sleep(randint(50,150)/1000)
                 # TODO remove
                 return driver
             except:
@@ -135,7 +135,7 @@ def fetchMatchedEntries(driver, mapTileIdentifierName):
 def googleMapSearchModules(driver, searchKey, mapTileIdentifierName, pageMax=10):
     driver.maximize_window()
     driver.get(f"https://www.google.com/maps/search/{searchKey.replace(' ','+')}")
-    time.sleep(randint(2000, 10000) / 1000)
+    time.sleep(randint(2000, 10000) / 10000)
     matched = fetchMatchedEntries(driver, mapTileIdentifierName)
 
     pageNum = 0
@@ -153,16 +153,16 @@ def googleMapSearchModules(driver, searchKey, mapTileIdentifierName, pageMax=10)
         pageNum += 1
         try: matched = {**matched, **fetchMatchedEntries(driver, mapTileIdentifierName)}
         except:
-            time.sleep(5)
+            time.sleep(50)
             matched = {**matched, **fetchMatchedEntries(driver, mapTileIdentifierName)}
     return matched
 
 
 def secndryPageOps(driver, matched, mapTileIdentifierName, location="New York"):
-    time.sleep(5)
+    time.sleep(50)
     driver.execute_script("arguments[0].scrollIntoView();", matched[list(matched.keys())[0]]['parent'])
     matched[list(matched.keys())[0]]['unit'].click()
-    time.sleep(randint(100, 5000) / 1000)
+    time.sleep(randint(10000, 100000) / 10000)
     try:
         try: WebDriverWait(driver, 30).until(EC.visibility_of_all_elements_located((By.TAG_NAME, "img")))
         except: pass
@@ -178,7 +178,7 @@ def secndryPageOps(driver, matched, mapTileIdentifierName, location="New York"):
             [x for x in matched[list(matched.keys())[0]]['parent'].find_elements(by=By.TAG_NAME, value="button") if x.get_attribute("data-value") == 'Directions'][0].click()
             ActionChains(driver).send_keys("New York")
 
-        time.sleep(20)
+        time.sleep(200)
     except Exception as e:
         logger.warning(f"Cant find Directions or Website entry {mapTileIdentifierName} : {e}")
 
@@ -192,9 +192,9 @@ def queueWorker(x):
     try:
         matched = googleMapSearchModules(driver, searchKey, mapTileIdentifierName, pageMax=10)
         if len(matched) > 0:
-            time.sleep(randint(100, 5000) / 1000)
+            time.sleep(randint(10000, 100000) / 10000)
             secndryPageOps(driver, matched, mapTileIdentifierName)
-            time.sleep(randint(100, 5000) / 1000)
+            time.sleep(randint(10000, 100000) / 10000)
     except Exception as e:
         logger.debug(e)
     driver.quit()
@@ -218,8 +218,9 @@ def core(queueData, parallelWorkerCount, df):
     random.shuffle(queueOfTasks)
     open("mapRun_Queue.cache", "w").write(json.dumps(queueOfTasks, indent=3))
     df.to_csv('mapRun_Queue.csv', index=False)
-    queueOfTasks_Set = [queueOfTasks[i:i + parallelWorkerCount] for i in
-                        range(0, len(queueOfTasks), parallelWorkerCount)]
+
+    queueOfTasks_Set = [queueOfTasks[i:i + parallelWorkerCount] for i in range(0, len(queueOfTasks), parallelWorkerCount)]
+
     for a,queueOfTasks in enumerate(queueOfTasks_Set[::-1]):
         logger.debug(f"Processing {(a*100)//len(queueOfTasks_Set)}% of daily traffic")
         try:
